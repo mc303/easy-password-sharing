@@ -31,11 +31,29 @@ The application will be available at `http://localhost:3000`
 
 ## 📦 Deployment
 
-### Node.js Hosting
-For full functionality including encrypted password storage:
+### Vercel (Recommended)
+Deploy to Vercel with automatic GitHub integration:
+
+1. **Install Vercel CLI** (optional):
+   ```bash
+   npm i -g vercel
+   ```
+
+2. **Deploy via GitHub**: 
+   - Connect your GitHub repository at [vercel.com](https://vercel.com)
+   - Import your repository 
+   - Vercel will automatically detect the Node.js configuration
+
+3. **Deploy via CLI**:
+   ```bash
+   vercel --prod
+   ```
+
+The `vercel.json` configuration is included for optimal Node.js deployment.
+
+### Other Node.js Hosting
 - **Render**: Connect GitHub repo for automatic deployments
 - **Railway**: `railway deploy` after connecting project
-- **Vercel**: `vercel --prod` with Node.js runtime
 - **Azure/AWS/GCP**: Deploy with Node.js app service
 
 ## 🔧 Configuration
