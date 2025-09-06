@@ -4,17 +4,9 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "public/**/*",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
-    {
-      "src": "/crypto-utils.js",
-      "dest": "/public/crypto-utils.js"
-    },
     {
       "src": "/api/(.*)",
       "dest": "/server.js"
@@ -22,10 +14,6 @@
     {
       "src": "/view/(.*)",
       "dest": "/server.js"
-    },
-    {
-      "src": "/(.*\\.(css|js|png|jpg|jpeg|gif|ico|svg))",
-      "dest": "/public/$1"
     },
     {
       "src": "/(.*)",
