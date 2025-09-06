@@ -380,6 +380,21 @@
         const errorDiv = document.getElementById('error');
         const submitBtn = document.getElementById('submitBtn');
         
+        let maxSecretLength = 50000; // Default fallback
+        
+        // Fetch config from server
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    maxSecretLength = config.maxSecretLength;
+                }
+            } catch (error) {
+                console.warn('Could not load config, using defaults');
+            }
+        }
+        
         function showError(message) {
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
@@ -427,8 +442,8 @@
                 return;
             }
             
-            if (secretText.length > 50000) {
-                showError('Secret text is too long (max 50,000 characters)');
+            if (secretText.length > maxSecretLength) {
+                showError(`Secret text is too long (max ${maxSecretLength.toLocaleString()} characters)`);
                 return;
             }
             
@@ -532,10 +547,13 @@
         }
         
         // Initialize password field as visible (since toggle is checked by default)
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const textarea = document.getElementById('secretText');
             textarea.style.webkitTextSecurity = 'none';
             textarea.style.textSecurity = 'none';
+            
+            // Load configuration from server
+            await loadConfig();
         });
         
         // Tab-style expiration selector functionality

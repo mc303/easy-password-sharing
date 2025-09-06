@@ -9,6 +9,7 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MAX_SECRET_LENGTH = parseInt(process.env.MAX_SECRET_LENGTH) || 50000;
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -85,6 +86,11 @@ app.post('/api/store', createLimiter, (req, res) => {
       return res.status(400).json({ error: 'Invalid data format' });
     }
     
+    // Validate encrypted data length (approximate check for original text length)
+    if (encryptedData.length > MAX_SECRET_LENGTH * 2) { // Base64 encoding roughly doubles size
+      return res.status(400).json({ error: `Secret too long (max ${MAX_SECRET_LENGTH} characters)` });
+    }
+    
     const expiration = parseInt(expirationMinutes);
     if (isNaN(expiration) || expiration < 1 || expiration > 10080) { // max 7 days
       return res.status(400).json({ error: 'Invalid expiration time' });
@@ -147,6 +153,12 @@ app.get('/api/retrieve/:id', retrieveLimiter, (req, res) => {
     console.error('Retrieve error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+app.get('/api/config', (req, res) => {
+  res.json({
+    maxSecretLength: MAX_SECRET_LENGTH
+  });
 });
 
 app.get('/api/health', (req, res) => {
