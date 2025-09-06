@@ -45,14 +45,14 @@ app.get('/crypto-utils.js', (req, res) => {
 app.use(express.static('public'));
 
 const createLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
+  max: parseInt(process.env.CREATE_RATE_LIMIT) || 10, // limit each IP to 10 requests per windowMs
   message: { error: 'Too many secrets created, try again later' }
 });
 
 const retrieveLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes  
-  max: 50, // limit each IP to 50 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
+  max: parseInt(process.env.RETRIEVE_RATE_LIMIT) || 50, // limit each IP to 50 requests per windowMs
   message: { error: 'Too many retrieval attempts, try again later' }
 });
 
