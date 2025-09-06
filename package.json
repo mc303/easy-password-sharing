@@ -1,5 +1,5 @@
 {
-  "name": "secure-password-share",
+  "name": "easy-password-sharing",
   "version": "1.0.0",
   "description": "Secure password sharing application with client-side encryption",
   "main": "server.js",

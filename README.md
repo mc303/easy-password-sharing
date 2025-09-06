@@ -1,4 +1,4 @@
-# 🔐 Secure Password Share
+# 🔐 Easy Password Sharing
 
 A secure, zero-knowledge password sharing application with client-side encryption, automatic expiration, and one-time access.
 
@@ -28,6 +28,15 @@ npm run dev
 ```
 
 The application will be available at `http://localhost:3000`
+
+## 📦 Deployment
+
+### Node.js Hosting
+For full functionality including encrypted password storage:
+- **Render**: Connect GitHub repo for automatic deployments
+- **Railway**: `railway deploy` after connecting project
+- **Vercel**: `vercel --prod` with Node.js runtime
+- **Azure/AWS/GCP**: Deploy with Node.js app service
 
 ## 🔧 Configuration
 
