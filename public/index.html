@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>Secure Password Share</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
+            background: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px;
+            color: #1e293b;
+        }
+        
+        .container {
+            background: transparent;
+            padding: 48px;
+            max-width: 720px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        
+        .header h1 {
+            color: #0f172a;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+        
+        
+        .header p {
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.6;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        
+        .form-group {
+            margin-bottom: 32px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 12px;
+            color: #374151;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        
+        textarea, select, input {
+            width: 100%;
+            padding: 5px;
+            border: 2px solid #e2e8f0;
+            border-radius: 0;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            background: #ffffff;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            line-height: 1.5;
+        }
+        
+        
+        .toggle-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .toggle-switch input[type="checkbox"] {
+            display: none;
+        }
+        
+        .slider {
+            position: relative;
+            width: 40px;
+            height: 20px;
+            background-color: #e2e8f0;
+            border-radius: 0;
+            transition: background-color 0.3s;
+        }
+        
+        .slider:before {
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            top: 2px;
+            background-color: white;
+            transition: transform 0.3s;
+        }
+        
+        .toggle-switch input:checked + .slider {
+            background-color: #3b82f6;
+        }
+        
+        .toggle-switch input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        
+        .toggle-label {
+            font-family: inherit;
+        }
+        
+        textarea:focus, select:focus, input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .expiration-tabs {
+            display: flex;
+            gap: 2px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 0;
+            margin-bottom: 8px;
+        }
+        
+        .expiration-tab {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 0;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .expiration-tab.active {
+            background: white;
+            color: #0f172a;
+        }
+        
+        .expiration-tab:hover:not(.active) {
+            color: #374151;
+        }
+        
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 18px 32px;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: auto;
+            transition: all 0.2s ease;
+            margin-top: 16px;
+        }
+        
+        .btn:hover {
+            background: #2563eb;
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 0;
+            padding: 48px;
+            max-width: 720px;
+            width: 100%;
+            background: transparent;
+            display: none;
+        }
+        
+        .result-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        
+        .result-header h1 {
+            color: #0f172a;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+        
+        .result-header p {
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.6;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        
+        .link-container {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 0;
+            padding: 5px;
+            margin: 16px 0 0 0;
+            word-break: break-all;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #374151;
+            min-height: 120px;
+            box-sizing: border-box;
+        }
+        
+        .copy-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 18px 32px;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: auto;
+            transition: all 0.2s ease;
+            margin-top: 16px;
+        }
+        
+        .copy-btn:hover {
+            background: #2563eb;
+        }
+        
+        .warning {
+            padding: 20px 0;
+            margin-top: 32px;
+            color: #92400e;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .warning ul {
+            margin-top: 12px;
+            padding-left: 20px;
+        }
+        
+        .warning li {
+            margin-bottom: 6px;
+        }
+        
+        .security-info {
+            padding: 16px 0;
+            margin-bottom: 32px;
+            color: #0c4a6e;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .security-info strong {
+            color: #0369a1;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-left: 8px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Generate secure password link</h1>
+            <p>Create secure, one-time links that expire automatically. Your data is encrypted client-side before transmission. The server only stores encrypted data - never the decryption key.</p>
+        </div>
+        
+        
+        <form id="secretForm">
+            <div class="form-group">
+                <textarea id="secretText" placeholder="Enter your password or secret text here..." required></textarea>
+                <div style="text-align: right; margin-top: 8px;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="visibilityToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Select Expiration Time</label>
+                <div class="expiration-tabs">
+                    <button type="button" class="expiration-tab" data-minutes="60">1 hour</button>
+                    <button type="button" class="expiration-tab active" data-minutes="480">8 hours</button>
+                    <button type="button" class="expiration-tab" data-minutes="1440">24 hours</button>
+                    <button type="button" class="expiration-tab" data-minutes="10080">1 week</button>
+                </div>
+                <input type="hidden" id="expiration" value="480" required>
+            </div>
+            
+            <div style="text-align: center;">
+                <button type="submit" class="btn" id="submitBtn">
+                    Encrypt & Create Link
+                </button>
+            </div>
+        </form>
+        
+        <div class="result" id="result">
+            <div class="result-header">
+                <h1>Secure Link Created</h1>
+                <p>Share this link to provide access to your secret:</p>
+            </div>
+            
+            <div class="form-group">
+                <div class="link-container" id="secretLink"></div>
+                <p id="expirationInfo" style="margin-top: 4px; color: #666; font-size: 13px; text-align: left;"></p>
+                <div style="text-align: center; margin-top: 8px;">
+                    <button class="copy-btn" id="copyLinkBtn">Copy Link</button>
+                </div>
+            </div>
+            
+            <p style="text-align: center; margin-top: 24px;">
+                <a href="#" id="newLinkBtn" style="color: #3b82f6; text-decoration: none; font-weight: 500;">← Create a new secret</a>
+            </p>
+        </div>
+        
+        
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script src="crypto-utils.js"></script>
+    <script>
+        const form = document.getElementById('secretForm');
+        const resultDiv = document.getElementById('result');
+        const errorDiv = document.getElementById('error');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+        }
+        
+        function hideError() {
+            errorDiv.style.display = 'none';
+        }
+        
+        function setLoading(loading) {
+            if (loading) {
+                submitBtn.innerHTML = 'Encrypting... <span class="loading"></span>';
+                submitBtn.disabled = true;
+            } else {
+                submitBtn.innerHTML = 'Encrypt & Create Link';
+                submitBtn.disabled = false;
+            }
+        }
+        
+        async function copyLink(event) {
+            const link = document.getElementById('secretLink').textContent;
+            try {
+                await navigator.clipboard.writeText(link);
+                const btn = document.getElementById('copyLinkBtn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy link:', err);
+            }
+        }
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            
+            const secretText = document.getElementById('secretText').value.trim();
+            const expiration = document.getElementById('expiration').value;
+            
+            if (!secretText || !expiration) {
+                showError('Please fill in all fields');
+                return;
+            }
+            
+            if (secretText.length > 50000) {
+                showError('Secret text is too long (max 50,000 characters)');
+                return;
+            }
+            
+            setLoading(true);
+            
+            try {
+                const { encryptedData, iv } = await encryptText(secretText);
+                
+                const response = await fetch('/api/store', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        encryptedData,
+                        iv,
+                        expirationMinutes: parseInt(expiration)
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to create secret');
+                }
+                
+                const data = await response.json();
+                
+                const secretUrl = `${window.location.origin}/view/${data.id}${window.location.hash}`;
+                document.getElementById('secretLink').textContent = secretUrl;
+                
+                const expirationDate = new Date(data.expiresAt);
+                const options = {
+                    year: 'numeric',
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZoneName: 'short'
+                };
+                document.getElementById('expirationInfo').textContent = 
+                    `Link expires: ${expirationDate.toLocaleDateString('en-US', options)}`;
+                
+                // Hide all other elements and only show the result
+                document.querySelector('.header').style.display = 'none';
+                form.style.display = 'none';
+                
+                resultDiv.style.display = 'block';
+                form.reset();
+                
+                document.getElementById('secretText').value = '';
+                
+            } catch (error) {
+                console.error('Error creating secret:', error);
+                showError(error.message || 'Failed to create secret. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        });
+        
+        // Add event listener for copy button
+        document.getElementById('copyLinkBtn').addEventListener('click', copyLink);
+        
+        // Add event listener for double-click on link text
+        document.getElementById('secretLink').addEventListener('dblclick', copyLink);
+        
+        // Add event listener for new link button
+        document.getElementById('newLinkBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            // Show all hidden elements again
+            document.querySelector('.header').style.display = 'block';
+            form.style.display = 'block';
+            
+            // Hide the result container
+            document.getElementById('result').style.display = 'none';
+            
+            // Clear the form and reset to default values
+            form.reset();
+            document.getElementById('secretText').value = '';
+            document.getElementById('expiration').value = '480';
+            
+            // Reset tab selection to default (8 hours)
+            document.querySelectorAll('.expiration-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.expiration-tab[data-minutes="480"]').classList.add('active');
+            
+            // Clear the URL hash
+            window.location.hash = '';
+        });
+        
+        // Password visibility toggle functionality
+        function togglePasswordVisibility() {
+            const textarea = document.getElementById('secretText');
+            const toggle = document.getElementById('visibilityToggle');
+            
+            if (toggle.checked) {
+                textarea.style.webkitTextSecurity = 'none';
+                textarea.style.textSecurity = 'none';
+            } else {
+                textarea.style.webkitTextSecurity = 'disc';
+                textarea.style.textSecurity = 'disc';
+            }
+        }
+        
+        // Initialize password field as visible (since toggle is checked by default)
+        document.addEventListener('DOMContentLoaded', () => {
+            const textarea = document.getElementById('secretText');
+            textarea.style.webkitTextSecurity = 'none';
+            textarea.style.textSecurity = 'none';
+        });
+        
+        // Tab-style expiration selector functionality
+        document.querySelectorAll('.expiration-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.expiration-tab').forEach(t => t.classList.remove('active'));
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                // Update hidden input value
+                document.getElementById('expiration').value = tab.getAttribute('data-minutes');
+            });
+        });
+        
+        // Add event listener for password toggle switch
+        document.getElementById('visibilityToggle').addEventListener('change', togglePasswordVisibility);
+    </script>
+</body>
+</html>
