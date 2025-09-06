@@ -35,14 +35,14 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-// Configure static file serving with proper MIME types
-app.use(express.static('public', {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.js')) {
-      res.setHeader('Content-Type', 'text/javascript');
-    }
-  }
-}));
+// Explicitly serve crypto-utils.js with correct MIME type
+app.get('/crypto-utils.js', (req, res) => {
+  res.setHeader('Content-Type', 'text/javascript');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(path.join(__dirname, 'public', 'crypto-utils.js'));
+});
+
+app.use(express.static('public'));
 
 const createLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
