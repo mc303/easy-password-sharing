@@ -311,6 +311,27 @@
             margin-top: 15px;
             font-size: 14px;
         }
+        
+        .generator-tab {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 0;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .generator-tab.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .generator-tab:hover:not(.active) {
+            background: #f3f4f6;
+        }
     </style>
 </head>
 <body>
@@ -323,6 +344,39 @@
         
         <form id="secretForm">
             <div class="form-group">
+                <label>Generate Password (Optional)</label>
+                <div style="margin-bottom: 16px; padding: 16px; border: 2px solid #e2e8f0; background: #f8fafc;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <button type="button" class="generator-tab active" data-type="password">Password</button>
+                        <button type="button" class="generator-tab" data-type="passphrase">Passphrase</button>
+                    </div>
+                    
+                    <div id="passwordOptions" class="generator-options">
+                        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 8px;">
+                            <label style="margin: 0; font-size: 14px; min-width: 60px;">Length:</label>
+                            <input type="number" id="passwordLength" min="4" max="128" value="16" style="width: 80px; padding: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div id="passphraseOptions" class="generator-options" style="display: none;">
+                        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 8px;">
+                            <label style="margin: 0; font-size: 14px; min-width: 60px;">Words:</label>
+                            <input type="number" id="wordCount" min="2" max="10" value="4" style="width: 80px; padding: 4px;">
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 8px;">
+                            <label style="margin: 0; font-size: 14px; min-width: 60px;">Separator:</label>
+                            <input type="text" id="separator" value="-" maxlength="3" style="width: 80px; padding: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button type="button" id="generateBtn" class="btn" style="padding: 8px 16px; font-size: 14px; margin: 0;">Generate</button>
+                        <button type="button" id="useGeneratedBtn" class="btn" style="padding: 8px 16px; font-size: 14px; margin: 0; background: #10b981; display: none;">Use This Password</button>
+                    </div>
+                    
+                    <div id="generatedPassword" style="display: none; margin-top: 12px; padding: 8px; background: white; border: 1px solid #d1d5db; font-family: 'Monaco', 'Menlo', monospace; word-break: break-all; font-size: 14px;"></div>
+                </div>
+                
                 <textarea id="secretText" placeholder="Enter your password or secret text here..." required></textarea>
                 <div style="text-align: right; margin-top: 8px;">
                     <label class="toggle-switch">
@@ -570,6 +624,81 @@
         
         // Add event listener for password toggle switch
         document.getElementById('visibilityToggle').addEventListener('change', togglePasswordVisibility);
+        
+        // Password generator functionality
+        let currentGeneratedPassword = '';
+        
+        // Tab switching
+        document.querySelectorAll('.generator-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.generator-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                const type = tab.getAttribute('data-type');
+                document.getElementById('passwordOptions').style.display = type === 'password' ? 'block' : 'none';
+                document.getElementById('passphraseOptions').style.display = type === 'passphrase' ? 'block' : 'none';
+                
+                // Hide generated password when switching tabs
+                document.getElementById('generatedPassword').style.display = 'none';
+                document.getElementById('useGeneratedBtn').style.display = 'none';
+                currentGeneratedPassword = '';
+            });
+        });
+        
+        // Generate password
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const activeTab = document.querySelector('.generator-tab.active');
+            const type = activeTab.getAttribute('data-type');
+            
+            let requestData = { type };
+            
+            if (type === 'password') {
+                requestData.length = document.getElementById('passwordLength').value;
+            } else {
+                requestData.wordCount = document.getElementById('wordCount').value;
+                requestData.separator = document.getElementById('separator').value;
+            }
+            
+            try {
+                const response = await fetch('/api/generate-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to generate password');
+                }
+                
+                const data = await response.json();
+                currentGeneratedPassword = data.password;
+                
+                document.getElementById('generatedPassword').textContent = currentGeneratedPassword;
+                document.getElementById('generatedPassword').style.display = 'block';
+                document.getElementById('useGeneratedBtn').style.display = 'inline-block';
+                
+            } catch (error) {
+                console.error('Error generating password:', error);
+                showError(error.message || 'Failed to generate password. Please try again.');
+            }
+        });
+        
+        // Use generated password
+        document.getElementById('useGeneratedBtn').addEventListener('click', () => {
+            if (currentGeneratedPassword) {
+                document.getElementById('secretText').value = currentGeneratedPassword;
+                // Hide the generator section after using the password
+                document.getElementById('generatedPassword').style.display = 'none';
+                document.getElementById('useGeneratedBtn').style.display = 'none';
+                currentGeneratedPassword = '';
+                
+                // Focus on the textarea
+                document.getElementById('secretText').focus();
+            }
+        });
     </script>
 </body>
 </html>

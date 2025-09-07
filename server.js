@@ -11,6 +11,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const MAX_SECRET_LENGTH = parseInt(process.env.MAX_SECRET_LENGTH) || 50000;
 
+// Password generator configuration
+const DEFAULT_PASSWORD_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+const PASSWORD_INCLUDE_CHARS = process.env.PASSWORD_INCLUDE_CHARS || DEFAULT_PASSWORD_CHARS;
+const PASSWORD_EXCLUDE_CHARS = process.env.PASSWORD_EXCLUDE_CHARS || '';
+const PASSPHRASE_SEPARATOR = process.env.PASSPHRASE_SEPARATOR || '-';
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -61,6 +67,56 @@ const secrets = new Map();
 
 function generateSecureId() {
   return crypto.randomBytes(32).toString('base64url');
+}
+
+// Password generator functions
+function generatePassword(length = 16) {
+  let chars = PASSWORD_INCLUDE_CHARS;
+  
+  // Remove excluded characters
+  if (PASSWORD_EXCLUDE_CHARS) {
+    for (const char of PASSWORD_EXCLUDE_CHARS) {
+      chars = chars.replace(new RegExp(`\\${char}`, 'g'), '');
+    }
+  }
+  
+  if (chars.length === 0) {
+    throw new Error('No valid characters available for password generation');
+  }
+  
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    const randomIndex = crypto.randomInt(0, chars.length);
+    password += chars[randomIndex];
+  }
+  
+  return password;
+}
+
+function generatePassphrase(wordCount = 4, separator = null) {
+  // Common word list for passphrases
+  const words = [
+    'apple', 'brave', 'chair', 'dance', 'eagle', 'flame', 'grace', 'house',
+    'image', 'juice', 'knife', 'light', 'mouse', 'nurse', 'ocean', 'piano',
+    'quiet', 'river', 'smile', 'table', 'uncle', 'voice', 'water', 'xerus',
+    'young', 'zebra', 'angel', 'bread', 'cloud', 'dream', 'earth', 'focus',
+    'giant', 'happy', 'index', 'joint', 'knock', 'laugh', 'magic', 'night',
+    'olive', 'peace', 'quest', 'radio', 'sugar', 'tower', 'unite', 'value',
+    'white', 'extra', 'yield', 'zesty', 'amber', 'beach', 'climb', 'depth',
+    'event', 'frost', 'group', 'heart', 'ideal', 'judge', 'karma', 'logic',
+    'merit', 'noble', 'orbit', 'power', 'quick', 'royal', 'spark', 'trust',
+    'urban', 'vivid', 'world', 'xenon', 'yacht', 'zones'
+  ];
+  
+  const usedSeparator = separator || PASSPHRASE_SEPARATOR;
+  let passphrase = [];
+  
+  for (let i = 0; i < wordCount; i++) {
+    const randomIndex = crypto.randomInt(0, words.length);
+    passphrase.push(words[randomIndex]);
+  }
+  
+  return passphrase.join(usedSeparator);
 }
 
 function cleanupExpired() {
@@ -157,8 +213,34 @@ app.get('/api/retrieve/:id', retrieveLimiter, (req, res) => {
 
 app.get('/api/config', (req, res) => {
   res.json({
-    maxSecretLength: MAX_SECRET_LENGTH
+    maxSecretLength: MAX_SECRET_LENGTH,
+    passwordConfig: {
+      includeChars: PASSWORD_INCLUDE_CHARS,
+      excludeChars: PASSWORD_EXCLUDE_CHARS,
+      defaultSeparator: PASSPHRASE_SEPARATOR
+    }
   });
+});
+
+app.post('/api/generate-password', (req, res) => {
+  try {
+    const { type, length, wordCount, separator } = req.body;
+    
+    if (type === 'password') {
+      const passwordLength = Math.min(Math.max(parseInt(length) || 16, 4), 128);
+      const password = generatePassword(passwordLength);
+      res.json({ password });
+    } else if (type === 'passphrase') {
+      const words = Math.min(Math.max(parseInt(wordCount) || 4, 2), 10);
+      const passphrase = generatePassphrase(words, separator);
+      res.json({ password: passphrase });
+    } else {
+      res.status(400).json({ error: 'Invalid type. Must be "password" or "passphrase"' });
+    }
+  } catch (error) {
+    console.error('Password generation error:', error);
+    res.status(500).json({ error: 'Failed to generate password' });
+  }
 });
 
 app.get('/api/health', (req, res) => {
