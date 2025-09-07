@@ -371,18 +371,6 @@
                     
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <button type="button" id="generateBtn" class="btn" style="padding: 8px 16px; font-size: 14px; margin: 0;">Generate</button>
-                        <button type="button" id="useGeneratedBtn" class="btn" style="padding: 8px 16px; font-size: 14px; margin: 0; background: #10b981; display: none;">Use This Password</button>
-                    </div>
-                    
-                    <div id="generatedPasswordContainer" style="display: none; margin-top: 12px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                            <span style="font-size: 12px; color: #6b7280;">Generated Password:</span>
-                            <label class="toggle-switch" style="font-size: 12px;">
-                                <input type="checkbox" id="generatedPasswordToggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div id="generatedPassword" style="padding: 8px; background: white; border: 1px solid #d1d5db; font-family: 'Monaco', 'Menlo', monospace; word-break: break-all; font-size: 14px;"></div>
                     </div>
                 </div>
                 
@@ -609,19 +597,6 @@
             }
         }
         
-        // Generated password visibility toggle functionality
-        function toggleGeneratedPasswordVisibility() {
-            const passwordDiv = document.getElementById('generatedPassword');
-            const toggle = document.getElementById('generatedPasswordToggle');
-            
-            if (toggle.checked) {
-                passwordDiv.style.webkitTextSecurity = 'none';
-                passwordDiv.style.textSecurity = 'none';
-            } else {
-                passwordDiv.style.webkitTextSecurity = 'disc';
-                passwordDiv.style.textSecurity = 'disc';
-            }
-        }
         
         // Initialize password field as visible (since toggle is checked by default)
         document.addEventListener('DOMContentLoaded', async () => {
@@ -648,8 +623,6 @@
         // Add event listener for password toggle switch
         document.getElementById('visibilityToggle').addEventListener('change', togglePasswordVisibility);
         
-        // Add event listener for generated password toggle switch
-        document.getElementById('generatedPasswordToggle').addEventListener('change', toggleGeneratedPasswordVisibility);
         
         // Password generator functionality
         let currentGeneratedPassword = '';
@@ -664,9 +637,7 @@
                 document.getElementById('passwordOptions').style.display = type === 'password' ? 'block' : 'none';
                 document.getElementById('passphraseOptions').style.display = type === 'passphrase' ? 'block' : 'none';
                 
-                // Hide generated password when switching tabs
-                document.getElementById('generatedPasswordContainer').style.display = 'none';
-                document.getElementById('useGeneratedBtn').style.display = 'none';
+                // Clear any generated password when switching tabs
                 currentGeneratedPassword = '';
             });
         });
@@ -702,12 +673,11 @@
                 const data = await response.json();
                 currentGeneratedPassword = data.password;
                 
-                document.getElementById('generatedPassword').textContent = currentGeneratedPassword;
-                document.getElementById('generatedPasswordContainer').style.display = 'block';
-                document.getElementById('useGeneratedBtn').style.display = 'inline-block';
+                // Directly populate the main textarea with the generated password
+                document.getElementById('secretText').value = currentGeneratedPassword;
                 
-                // Apply initial visibility state
-                toggleGeneratedPasswordVisibility();
+                // Focus on the textarea
+                document.getElementById('secretText').focus();
                 
             } catch (error) {
                 console.error('Error generating password:', error);
@@ -715,19 +685,6 @@
             }
         });
         
-        // Use generated password
-        document.getElementById('useGeneratedBtn').addEventListener('click', () => {
-            if (currentGeneratedPassword) {
-                document.getElementById('secretText').value = currentGeneratedPassword;
-                // Hide the generator section after using the password
-                document.getElementById('generatedPasswordContainer').style.display = 'none';
-                document.getElementById('useGeneratedBtn').style.display = 'none';
-                currentGeneratedPassword = '';
-                
-                // Focus on the textarea
-                document.getElementById('secretText').focus();
-            }
-        });
     </script>
 </body>
 </html>
