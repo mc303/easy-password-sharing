@@ -344,8 +344,14 @@
         
         <form id="secretForm">
             <div class="form-group">
-                <label>Generate Password (Optional)</label>
-                <div style="margin-bottom: 16px; padding: 16px; border: 2px solid #e2e8f0; background: #f8fafc;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <label style="margin: 0;">Generate Password (Optional)</label>
+                    <label class="toggle-switch" style="font-size: 12px;">
+                        <input type="checkbox" id="generatorToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="generatorSection" style="margin-bottom: 16px; padding: 16px; border: 2px solid #e2e8f0; background: #f8fafc; display: none;">
                     <div style="display: flex; gap: 8px; margin-bottom: 12px;">
                         <button type="button" class="generator-tab active" data-type="password">Password</button>
                         <button type="button" class="generator-tab" data-type="passphrase">Passphrase</button>
@@ -622,6 +628,23 @@
         
         // Add event listener for password toggle switch
         document.getElementById('visibilityToggle').addEventListener('change', togglePasswordVisibility);
+        
+        // Generator section toggle functionality
+        function toggleGeneratorSection() {
+            const generatorSection = document.getElementById('generatorSection');
+            const toggle = document.getElementById('generatorToggle');
+            
+            if (toggle.checked) {
+                generatorSection.style.display = 'block';
+            } else {
+                generatorSection.style.display = 'none';
+                // Clear any generated password when hiding the section
+                currentGeneratedPassword = '';
+            }
+        }
+        
+        // Add event listener for generator section toggle
+        document.getElementById('generatorToggle').addEventListener('change', toggleGeneratorSection);
         
         
         // Password generator functionality
