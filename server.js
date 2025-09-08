@@ -113,7 +113,10 @@ function generatePassphrase(wordCount = 4, separator = null) {
   
   for (let i = 0; i < wordCount; i++) {
     const randomIndex = crypto.randomInt(0, words.length);
-    passphrase.push(words[randomIndex]);
+    const word = words[randomIndex];
+    // Capitalize first letter of each word
+    const capitalizedWord = word.charAt(0).toUpperCase() + word.slice(1);
+    passphrase.push(capitalizedWord);
   }
   
   return passphrase.join(usedSeparator);
