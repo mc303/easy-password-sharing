@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
     <title>Easy Password Sharing</title>
     <style>
         * {
@@ -345,7 +345,7 @@
         <form id="secretForm">
             <div class="form-group">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <label style="margin: 0;">Generate Password (Optional)</label>
+                    <label style="margin: 0;">Generate Password</label>
                     <label class="toggle-switch" style="font-size: 12px;">
                         <input type="checkbox" id="generatorToggle">
                         <span class="slider"></span>
@@ -439,6 +439,35 @@
         
         let maxSecretLength = 50000; // Default fallback
         
+        // Security: Input sanitization functions
+        function sanitizeInput(input) {
+            if (typeof input !== 'string') return '';
+            
+            // Remove HTML tags and dangerous characters
+            return input
+                .replace(/[<>]/g, '') // Remove angle brackets
+                .replace(/javascript:/gi, '') // Remove javascript: protocol
+                .replace(/on\w+=/gi, '') // Remove event handlers
+                .replace(/data:/gi, '') // Remove data: URLs
+                .replace(/vbscript:/gi, '') // Remove VBScript
+                .trim();
+        }
+        
+        function sanitizeNumericInput(input) {
+            const num = parseInt(input);
+            return isNaN(num) ? 0 : Math.max(0, Math.min(num, 999999));
+        }
+        
+        function sanitizeSeparator(input) {
+            if (typeof input !== 'string') return '-';
+            
+            // Only allow safe separator characters
+            const safeSeparators = /^[._\-#@$%&*+=|~`^!?]+$/;
+            const cleaned = input.slice(0, 10); // Max 10 chars
+            
+            return safeSeparators.test(cleaned) ? cleaned : '-';
+        }
+        
         // Fetch config from server
         async function loadConfig() {
             try {
@@ -491,16 +520,36 @@
             e.preventDefault();
             hideError();
             
-            const secretText = document.getElementById('secretText').value.trim();
+            let secretText = document.getElementById('secretText').value;
             const expiration = document.getElementById('expiration').value;
             
+            // Security: Validate and sanitize inputs
             if (!secretText || !expiration) {
                 showError('Please fill in all fields');
                 return;
             }
             
+            // Trim whitespace but preserve intentional spaces within the secret
+            secretText = secretText.trim();
+            
+            // Validate expiration is a safe number
+            const sanitizedExpiration = sanitizeNumericInput(expiration);
+            if (sanitizedExpiration < 1 || sanitizedExpiration > 10080) {
+                showError('Invalid expiration time');
+                return;
+            }
+            
+            // Check length after sanitization
             if (secretText.length > maxSecretLength) {
                 showError(`Secret text is too long (max ${maxSecretLength.toLocaleString()} characters)`);
+                return;
+            }
+            
+            // Additional security: Check for suspicious patterns
+            if (secretText.toLowerCase().includes('<script') || 
+                secretText.toLowerCase().includes('javascript:') ||
+                secretText.toLowerCase().includes('data:text/html')) {
+                showError('Secret contains potentially unsafe content');
                 return;
             }
             
@@ -677,11 +726,28 @@
             
             let requestData = { type };
             
+            // Security: Sanitize all generator inputs
             if (type === 'password') {
-                requestData.length = document.getElementById('passwordLength').value;
+                const lengthInput = document.getElementById('passwordLength').value;
+                requestData.length = sanitizeNumericInput(lengthInput);
+                
+                // Validate password length range
+                if (requestData.length < 4 || requestData.length > 128) {
+                    showError('Password length must be between 4 and 128 characters');
+                    return;
+                }
             } else {
-                requestData.wordCount = document.getElementById('wordCount').value;
-                requestData.separator = document.getElementById('separator').value;
+                const wordCountInput = document.getElementById('wordCount').value;
+                const separatorInput = document.getElementById('separator').value;
+                
+                requestData.wordCount = sanitizeNumericInput(wordCountInput);
+                requestData.separator = sanitizeSeparator(separatorInput);
+                
+                // Validate word count range
+                if (requestData.wordCount < 2 || requestData.wordCount > 10) {
+                    showError('Word count must be between 2 and 10 words');
+                    return;
+                }
             }
             
             try {

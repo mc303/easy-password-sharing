@@ -65,6 +65,81 @@ const retrieveLimiter = rateLimit({
 
 const secrets = new Map();
 
+// Security: Input sanitization functions
+function sanitizeString(input, maxLength = 1000) {
+  if (typeof input !== 'string') return '';
+  
+  return input
+    .slice(0, maxLength) // Limit length
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+    .trim();
+}
+
+function validateSecretContent(content) {
+  if (!content || typeof content !== 'string') {
+    return { valid: false, error: 'Invalid content' };
+  }
+  
+  // Check for suspicious patterns that might indicate XSS attempts
+  const suspiciousPatterns = [
+    /<script[^>]*>/i,
+    /javascript:/i,
+    /data:text\/html/i,
+    /vbscript:/i,
+    /on\w+\s*=/i,
+    /<iframe[^>]*>/i,
+    /<object[^>]*>/i,
+    /<embed[^>]*>/i
+  ];
+  
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(content)) {
+      return { valid: false, error: 'Content contains potentially unsafe elements' };
+    }
+  }
+  
+  return { valid: true };
+}
+
+function validateAndSanitizeGeneratorInput(type, length, wordCount, separator) {
+  const result = { valid: true, sanitized: {} };
+  
+  // Validate type
+  if (!type || (type !== 'password' && type !== 'passphrase')) {
+    return { valid: false, error: 'Invalid generation type' };
+  }
+  
+  result.sanitized.type = type;
+  
+  if (type === 'password') {
+    const len = parseInt(length);
+    if (isNaN(len) || len < 4 || len > 128) {
+      return { valid: false, error: 'Invalid password length' };
+    }
+    result.sanitized.length = len;
+  } else {
+    const words = parseInt(wordCount) || 4;
+    if (isNaN(words) || words < 2 || words > 10) {
+      return { valid: false, error: 'Invalid word count' };
+    }
+    
+    // Sanitize separator
+    let sep = separator || '-';
+    if (typeof sep !== 'string') sep = '-';
+    sep = sanitizeString(sep, 10);
+    
+    // Only allow safe separator characters
+    if (!/^[._\-#@$%&*+=|~`^!?\s]*$/.test(sep)) {
+      sep = '-';
+    }
+    
+    result.sanitized.wordCount = words;
+    result.sanitized.separator = sep;
+  }
+  
+  return result;
+}
+
 function generateSecureId() {
   return crypto.randomBytes(32).toString('base64url');
 }
@@ -459,18 +534,28 @@ setInterval(cleanupExpired, 60000); // Clean up every minute
 
 app.post('/api/store', createLimiter, (req, res) => {
   try {
-    const { encryptedData, iv, expirationMinutes } = req.body;
+    let { encryptedData, iv, expirationMinutes } = req.body;
     
     if (!encryptedData || !iv || !expirationMinutes) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    if (typeof encryptedData !== 'string' || typeof iv !== 'string') {
-      return res.status(400).json({ error: 'Invalid data format' });
+    // Security: Sanitize and validate inputs
+    encryptedData = sanitizeString(encryptedData, MAX_SECRET_LENGTH * 3);
+    iv = sanitizeString(iv, 1000);
+    
+    if (!encryptedData || !iv) {
+      return res.status(400).json({ error: 'Invalid data format after sanitization' });
     }
     
-    // Validate encrypted data length (approximate check for original text length)
-    if (encryptedData.length > MAX_SECRET_LENGTH * 2) { // Base64 encoding roughly doubles size
+    // Additional validation for base64 format
+    const base64Pattern = /^[A-Za-z0-9+/=_-]+$/;
+    if (!base64Pattern.test(encryptedData) || !base64Pattern.test(iv)) {
+      return res.status(400).json({ error: 'Invalid encryption data format' });
+    }
+    
+    // Validate encrypted data length
+    if (encryptedData.length > MAX_SECRET_LENGTH * 2) {
       return res.status(400).json({ error: `Secret too long (max ${MAX_SECRET_LENGTH} characters)` });
     }
     
@@ -553,50 +638,30 @@ app.post('/api/generate-password', (req, res) => {
   try {
     const { type, length, wordCount, separator } = req.body;
     
-    // Validate input parameters
-    if (!type || (type !== 'password' && type !== 'passphrase')) {
-      return res.status(400).json({ error: 'Invalid type. Must be "password" or "passphrase"' });
+    // Security: Validate and sanitize all inputs
+    const validation = validateAndSanitizeGeneratorInput(type, length, wordCount, separator);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
     }
     
-    if (type === 'password') {
-      const passwordLength = parseInt(length);
-      
-      // Validate password length
-      if (isNaN(passwordLength) || passwordLength < 4 || passwordLength > 128) {
-        return res.status(400).json({ error: 'Password length must be between 4 and 128 characters' });
-      }
-      
-      const password = generatePassword(passwordLength);
+    const { type: safeType, length: safeLength, wordCount: safeWordCount, separator: safeSeparator } = validation.sanitized;
+    
+    if (safeType === 'password') {
+      const password = generatePassword(safeLength);
       
       // Additional security check
-      if (!password || password.length !== passwordLength) {
+      if (!password || password.length !== safeLength) {
         throw new Error('Password generation validation failed');
       }
       
       res.json({ password });
       
-    } else if (type === 'passphrase') {
-      const words = parseInt(wordCount) || 4;
-      
-      // Validate word count
-      if (isNaN(words) || words < 2 || words > 10) {
-        return res.status(400).json({ error: 'Word count must be between 2 and 10 words' });
-      }
-      
-      // Validate separator
-      if (separator && typeof separator !== 'string') {
-        return res.status(400).json({ error: 'Separator must be a string' });
-      }
-      
-      if (separator && separator.length > 10) {
-        return res.status(400).json({ error: 'Separator too long (max 10 characters)' });
-      }
-      
-      const passphrase = generatePassphrase(words, separator);
+    } else if (safeType === 'passphrase') {
+      const passphrase = generatePassphrase(safeWordCount, safeSeparator);
       
       // Additional security check
-      const passphraseWords = passphrase.split(separator || PASSPHRASE_SEPARATOR);
-      if (passphraseWords.length !== words) {
+      const passphraseWords = passphrase.split(safeSeparator || PASSPHRASE_SEPARATOR);
+      if (passphraseWords.length !== safeWordCount) {
         throw new Error('Passphrase generation validation failed');
       }
       
