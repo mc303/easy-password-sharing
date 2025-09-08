@@ -610,6 +610,11 @@
             textarea.style.webkitTextSecurity = 'none';
             textarea.style.textSecurity = 'none';
             
+            // Force generator toggle to start OFF on every page load
+            const generatorToggle = document.getElementById('generatorToggle');
+            generatorToggle.checked = false;
+            toggleGeneratorSection(); // Apply the initial state
+            
             // Load configuration from server
             await loadConfig();
         });
