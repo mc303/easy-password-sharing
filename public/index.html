@@ -520,6 +520,11 @@
             e.preventDefault();
             hideError();
             
+            // Turn off generator toggle when creating a link
+            const generatorToggle = document.getElementById('generatorToggle');
+            generatorToggle.checked = false;
+            toggleGeneratorSection();
+            
             let secretText = document.getElementById('secretText').value;
             const expiration = document.getElementById('expiration').value;
             

@@ -12,10 +12,9 @@ const PORT = process.env.PORT || 3000;
 const MAX_SECRET_LENGTH = parseInt(process.env.MAX_SECRET_LENGTH) || 50000;
 
 // Password generator configuration
-const DEFAULT_PASSWORD_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-const PASSWORD_INCLUDE_CHARS = process.env.PASSWORD_INCLUDE_CHARS || DEFAULT_PASSWORD_CHARS;
+const DEFAULT_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 const PASSWORD_EXCLUDE_CHARS = process.env.PASSWORD_EXCLUDE_CHARS || '';
-const PASSPHRASE_SEPARATOR = process.env.PASSPHRASE_SEPARATOR || '-';
+const PASSWORD_SPECIAL_CHARS = process.env.PASSWORD_SPECIAL_CHARS || DEFAULT_SPECIAL_CHARS;
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -146,33 +145,65 @@ function generateSecureId() {
 
 // Password generator functions with cryptographic security
 function generatePassword(length = 16) {
-  let chars = PASSWORD_INCLUDE_CHARS;
+  // Ensure minimum length for complexity requirements
+  if (length < 4) {
+    throw new Error('Password length must be at least 4 characters to meet complexity requirements');
+  }
   
-  // Remove excluded characters
-  if (PASSWORD_EXCLUDE_CHARS) {
+  // Define standard character categories
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = PASSWORD_SPECIAL_CHARS;
+  
+  // Apply exclusions to each category
+  function filterCategory(category) {
+    if (!PASSWORD_EXCLUDE_CHARS) return category;
+    let filtered = category;
     for (const char of PASSWORD_EXCLUDE_CHARS) {
-      chars = chars.replace(new RegExp(`\\${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), '');
+      filtered = filtered.replace(new RegExp(`\\${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), '');
     }
+    return filtered;
   }
   
-  if (chars.length === 0) {
-    throw new Error('No valid characters available for password generation');
+  const availableUppercase = filterCategory(uppercase);
+  const availableLowercase = filterCategory(lowercase);
+  const availableDigits = filterCategory(digits);
+  const availableSpecial = filterCategory(special);
+  
+  // Build final character pool from filtered categories
+  const availableChars = availableUppercase + availableLowercase + availableDigits + availableSpecial;
+  
+  // Ensure we have at least one character from each required category
+  if (availableUppercase.length === 0 || availableLowercase.length === 0 || 
+      availableDigits.length === 0 || availableSpecial.length === 0) {
+    throw new Error('Cannot meet complexity requirements: missing required character types after exclusions');
   }
   
-  // Ensure minimum character set diversity for security
-  if (chars.length < 10) {
+  if (availableChars.length < 10) {
     throw new Error('Character set too small for secure password generation (minimum 10 characters)');
   }
   
-  // Use cryptographically secure random generation
+  // Start with one character from each required category
   let password = '';
-  const charsetLength = chars.length;
+  password += availableUppercase[crypto.randomInt(0, availableUppercase.length)];
+  password += availableLowercase[crypto.randomInt(0, availableLowercase.length)];
+  password += availableDigits[crypto.randomInt(0, availableDigits.length)];
+  password += availableSpecial[crypto.randomInt(0, availableSpecial.length)];
   
-  for (let i = 0; i < length; i++) {
-    // Use crypto.randomInt for cryptographically secure randomness
-    const randomIndex = crypto.randomInt(0, charsetLength);
-    password += chars[randomIndex];
+  // Fill remaining positions with random characters from full available set
+  for (let i = 4; i < length; i++) {
+    const randomIndex = crypto.randomInt(0, availableChars.length);
+    password += availableChars[randomIndex];
   }
+  
+  // Shuffle the password to randomize character positions
+  const passwordArray = password.split('');
+  for (let i = passwordArray.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [passwordArray[i], passwordArray[j]] = [passwordArray[j], passwordArray[i]];
+  }
+  password = passwordArray.join('');
   
   // Verify password has reasonable entropy
   const uniqueChars = new Set(password).size;
@@ -495,7 +526,7 @@ function generatePassphrase(wordCount = 4, separator = null) {
     'yesterday', 'yet', 'yield', 'you', 'young', 'your', 'yours', 'yourself', 'youth', 'zone'
   ];
   
-  const usedSeparator = separator || PASSPHRASE_SEPARATOR;
+  const usedSeparator = separator || '-';
   let passphrase = [];
   let usedWords = new Set(); // Prevent word reuse
   
@@ -627,9 +658,9 @@ app.get('/api/config', (req, res) => {
   res.json({
     maxSecretLength: MAX_SECRET_LENGTH,
     passwordConfig: {
-      includeChars: PASSWORD_INCLUDE_CHARS,
       excludeChars: PASSWORD_EXCLUDE_CHARS,
-      defaultSeparator: PASSPHRASE_SEPARATOR
+      specialChars: PASSWORD_SPECIAL_CHARS,
+      defaultSeparator: '-'
     }
   });
 });
@@ -660,7 +691,7 @@ app.post('/api/generate-password', (req, res) => {
       const passphrase = generatePassphrase(safeWordCount, safeSeparator);
       
       // Additional security check
-      const passphraseWords = passphrase.split(safeSeparator || PASSPHRASE_SEPARATOR);
+      const passphraseWords = passphrase.split(safeSeparator || '-');
       if (passphraseWords.length !== safeWordCount) {
         throw new Error('Passphrase generation validation failed');
       }
