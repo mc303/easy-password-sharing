@@ -1,3 +1,6 @@
+// Load environment variables
+require('dotenv').config();
+
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -6,15 +9,17 @@ const crypto = require('crypto');
 const path = require('path');
 const https = require('https');
 const fs = require('fs');
+const { storage } = require('./storage');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT) || 3000;
 const MAX_SECRET_LENGTH = parseInt(process.env.MAX_SECRET_LENGTH) || 50000;
 
 // Password generator configuration
 const DEFAULT_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 const PASSWORD_EXCLUDE_CHARS = process.env.PASSWORD_EXCLUDE_CHARS || '';
 const PASSWORD_SPECIAL_CHARS = process.env.PASSWORD_SPECIAL_CHARS || DEFAULT_SPECIAL_CHARS;
+const PASSPHRASE_SEPARATOR = process.env.PASSPHRASE_SEPARATOR || '-';
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -62,7 +67,7 @@ const retrieveLimiter = rateLimit({
   message: { error: 'Too many retrieval attempts, try again later' }
 });
 
-const secrets = new Map();
+// Storage is now handled by the storage manager
 
 // Security: Input sanitization functions
 function sanitizeString(input, maxLength = 1000) {
@@ -145,6 +150,7 @@ function generateSecureId() {
 
 // Password generator functions with cryptographic security
 function generatePassword(length = 16) {
+<<<<<<< HEAD
   // Ensure minimum length for complexity requirements
   if (length < 4) {
     throw new Error('Password length must be at least 4 characters to meet complexity requirements');
@@ -160,6 +166,18 @@ function generatePassword(length = 16) {
   function filterCategory(category) {
     if (!PASSWORD_EXCLUDE_CHARS) return category;
     let filtered = category;
+=======
+  let chars = PASSWORD_INCLUDE_CHARS;
+
+  // If special chars are specified, use only those plus alphanumeric
+  if (PASSWORD_SPECIAL_CHARS) {
+    const alphanum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    chars = alphanum + PASSWORD_SPECIAL_CHARS;
+  }
+
+  // Remove excluded characters
+  if (PASSWORD_EXCLUDE_CHARS) {
+>>>>>>> c8370f0 (Add comprehensive storage abstraction layer with Redis support)
     for (const char of PASSWORD_EXCLUDE_CHARS) {
       filtered = filtered.replace(new RegExp(`\\${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), '');
     }
@@ -552,102 +570,86 @@ function generatePassphrase(wordCount = 4, separator = null) {
   return passphrase.join(usedSeparator);
 }
 
-function cleanupExpired() {
-  const now = Date.now();
-  for (const [id, secret] of secrets.entries()) {
-    if (secret.expiresAt && now > secret.expiresAt) {
-      secrets.delete(id);
-    }
-  }
-}
+// Cleanup is now handled automatically by the storage backends
 
-setInterval(cleanupExpired, 60000); // Clean up every minute
-
-app.post('/api/store', createLimiter, (req, res) => {
+app.post('/api/store', createLimiter, async (req, res) => {
   try {
     let { encryptedData, iv, expirationMinutes } = req.body;
-    
+
     if (!encryptedData || !iv || !expirationMinutes) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    
+
     // Security: Sanitize and validate inputs
     encryptedData = sanitizeString(encryptedData, MAX_SECRET_LENGTH * 3);
     iv = sanitizeString(iv, 1000);
-    
+
     if (!encryptedData || !iv) {
       return res.status(400).json({ error: 'Invalid data format after sanitization' });
     }
-    
+
     // Additional validation for base64 format
     const base64Pattern = /^[A-Za-z0-9+/=_-]+$/;
     if (!base64Pattern.test(encryptedData) || !base64Pattern.test(iv)) {
       return res.status(400).json({ error: 'Invalid encryption data format' });
     }
-    
+
     // Validate encrypted data length
     if (encryptedData.length > MAX_SECRET_LENGTH * 2) {
       return res.status(400).json({ error: `Secret too long (max ${MAX_SECRET_LENGTH} characters)` });
     }
-    
+
     const expiration = parseInt(expirationMinutes);
     if (isNaN(expiration) || expiration < 1 || expiration > 10080) { // max 7 days
       return res.status(400).json({ error: 'Invalid expiration time' });
     }
-    
+
     const id = generateSecureId();
-    const expiresAt = Date.now() + (expiration * 60 * 1000);
-    
-    secrets.set(id, {
-      encryptedData,
-      iv,
-      expiresAt,
-      accessed: false
-    });
-    
-    res.json({ 
-      id,
-      expiresAt: new Date(expiresAt).toISOString()
-    });
-    
+
+    try {
+      const result = await storage.setSecret(id, { encryptedData, iv }, expiration);
+
+      res.json({
+        id,
+        expiresAt: new Date(result.expiresAt).toISOString()
+      });
+
+    } catch (storageError) {
+      console.error('Storage error:', storageError);
+      res.status(503).json({ error: 'Storage service unavailable. Please try again.' });
+    }
+
   } catch (error) {
     console.error('Store error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.get('/api/retrieve/:id', retrieveLimiter, (req, res) => {
+app.get('/api/retrieve/:id', retrieveLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     if (!id || typeof id !== 'string') {
       return res.status(400).json({ error: 'Invalid ID' });
     }
-    
-    const secret = secrets.get(id);
-    
-    if (!secret) {
-      return res.status(404).json({ error: 'Secret not found or expired' });
+
+    try {
+      const secretData = await storage.getAndDeleteSecret(id);
+
+      if (!secretData) {
+        return res.status(404).json({ error: 'Secret not found or expired' });
+      }
+
+      res.json({
+        encryptedData: secretData.encryptedData,
+        iv: secretData.iv
+      });
+
+    } catch (storageError) {
+      console.error('Storage error during retrieval:', storageError);
+      res.status(503).json({ error: 'Storage service unavailable. Please try again.' });
     }
-    
-    if (secret.accessed) {
-      secrets.delete(id);
-      return res.status(404).json({ error: 'Secret has already been accessed' });
-    }
-    
-    if (Date.now() > secret.expiresAt) {
-      secrets.delete(id);
-      return res.status(404).json({ error: 'Secret has expired' });
-    }
-    
-    secret.accessed = true;
-    secrets.delete(id);
-    
-    res.json({
-      encryptedData: secret.encryptedData,
-      iv: secret.iv
-    });
-    
+
   } catch (error) {
     console.error('Retrieve error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -707,12 +709,26 @@ app.post('/api/generate-password', (req, res) => {
   }
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    activeSecrets: secrets.size,
-    uptime: process.uptime()
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    const stats = await storage.getStats();
+    const isHealthy = await storage.healthCheck();
+
+    res.json({
+      status: isHealthy ? 'ok' : 'degraded',
+      storage: stats,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      error: 'Health check failed',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 app.get('/', (req, res) => {
@@ -735,21 +751,37 @@ app.use((error, req, res, next) => {
 // HTTPS configuration for development
 const useHTTPS = process.env.USE_HTTPS === 'true' || fs.existsSync('cert.pem');
 
-if (useHTTPS && fs.existsSync('cert.pem') && fs.existsSync('key.pem')) {
+// Initialize storage and start server
+async function startServer() {
+  try {
+    // Initialize storage to determine backend
+    await storage.initialize();
+
+    if (useHTTPS && fs.existsSync('cert.pem') && fs.existsSync('key.pem')) {
   const httpsOptions = {
     key: fs.readFileSync('key.pem'),
     cert: fs.readFileSync('cert.pem')
   };
-  
-  https.createServer(httpsOptions, app).listen(PORT, () => {
-    console.log(`🔒 Secure password share server running on HTTPS port ${PORT}`);
-    console.log(`🌐 Access at: https://localhost:${PORT}`);
-    console.log(`📝 Note: You'll need to accept the self-signed certificate`);
-    console.log(`💾 Memory-only storage - secrets will be lost on restart`);
-  });
-} else {
-  app.listen(PORT, () => {
-    console.log(`Secure password share server running on HTTP port ${PORT}`);
-    console.log(`Memory-only storage - secrets will be lost on restart`);
-  });
+
+  https.createServer(httpsOptions, app).listen(PORT, '0.0.0.0', () => {
+      console.log(`🔒 Secure password share server running on HTTPS port ${PORT}`);
+      console.log(`🌐 Access at: https://localhost:${PORT}`);
+      console.log(`📝 Note: You'll need to accept the self-signed certificate`);
+      console.log(`💾 ${storage.backend} storage initialized`);
+    });
+  } else {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Secure password share server running on HTTP port ${PORT}`);
+      console.log(`🌐 Access at: http://localhost:${PORT}`);
+      console.log(`💾 ${storage.backend} storage initialized`);
+    });
+  }
+
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 }
+
+// Start the server
+startServer();
