@@ -150,34 +150,21 @@ function generateSecureId() {
 
 // Password generator functions with cryptographic security
 function generatePassword(length = 16) {
-<<<<<<< HEAD
-  // Ensure minimum length for complexity requirements
+// Ensure minimum length for complexity requirements
   if (length < 4) {
     throw new Error('Password length must be at least 4 characters to meet complexity requirements');
   }
-  
+
   // Define standard character categories
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';
   const digits = '0123456789';
   const special = PASSWORD_SPECIAL_CHARS;
-  
+
   // Apply exclusions to each category
   function filterCategory(category) {
     if (!PASSWORD_EXCLUDE_CHARS) return category;
     let filtered = category;
-=======
-  let chars = PASSWORD_INCLUDE_CHARS;
-
-  // If special chars are specified, use only those plus alphanumeric
-  if (PASSWORD_SPECIAL_CHARS) {
-    const alphanum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    chars = alphanum + PASSWORD_SPECIAL_CHARS;
-  }
-
-  // Remove excluded characters
-  if (PASSWORD_EXCLUDE_CHARS) {
->>>>>>> c8370f0 (Add comprehensive storage abstraction layer with Redis support)
     for (const char of PASSWORD_EXCLUDE_CHARS) {
       filtered = filtered.replace(new RegExp(`\\${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), '');
     }
