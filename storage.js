@@ -99,14 +99,7 @@ class StorageManager {
         throw new Error('REDIS_URL environment variable is not set');
       }
 
-      // Ensure Redis URL uses secure connection
-      let secureRedisUrl = redisUrl;
-      if (redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
-        secureRedisUrl = redisUrl.replace('redis://', 'rediss://');
-        console.log('🔗 Upgraded redis:// to rediss:// for secure connection');
-      }
-
-      console.log(`🔗 Attempting to connect to Redis with URL: ${secureRedisUrl.replace(/:.*@/, ':***@')}`);
+      console.log(`🔗 Attempting to connect to Redis with URL: ${redisUrl.replace(/:.*@/, ':***@')}`);
 
       // Check for Upstash-specific patterns in URL
       const isUpstash = redisUrl && (
@@ -139,10 +132,11 @@ class StorageManager {
         const redis = await import('redis');
         console.log('🔗 Detected standard Redis, using node-redis client');
         this.redis = redis.createClient({
-          url: secureRedisUrl,
+          url: redisUrl,
           socket: {
             connectTimeout: 10000,
-            lazyConnect: false  // Disable lazy connect for serverless
+            lazyConnect: false,  // Disable lazy connect for serverless
+            tls: false  // Disable TLS for Redis.com compatibility
           }
         });
 

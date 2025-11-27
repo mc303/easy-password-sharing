@@ -44,8 +44,8 @@ app.use(cors({
   credentials: false
 }));
 
-// Trust proxy for Vercel (needed for express-rate-limit)
-app.set('trust proxy', true);
+// Trust proxy for Vercel - only trust specific Vercel IPs
+app.set('trust proxy', 1);
 
 app.use(express.json({ limit: '10mb' }));
 
