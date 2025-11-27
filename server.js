@@ -770,5 +770,10 @@ async function startServer() {
   }
 }
 
-// Start the server
-startServer();
+// Vercel serverless function export
+module.exports = app;
+
+// Start server only when not running in Vercel serverless environment
+if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+  startServer();
+}

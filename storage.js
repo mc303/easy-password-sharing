@@ -92,37 +92,48 @@ class StorageManager {
 
   async initRedisUrl() {
     try {
-      // For REDIS_URL with Upstash, we need to convert redis:// URL to REST API format
-      const { Redis } = await import('@upstash/redis');
-
+      // Check if this is Upstash Redis or regular Redis
       const redisUrl = process.env.REDIS_URL;
 
-      // Upstash Redis client expects HTTPS REST API URLs, not redis:// URLs
-      let clientConfig;
+      // Check for Upstash-specific patterns in URL
+      const isUpstash = redisUrl && (
+        redisUrl.includes('upstash.io') ||
+        redisUrl.includes('upstash') ||
+        process.env.UPSTASH_REDIS_REST_TOKEN
+      );
 
-      if (redisUrl.startsWith('rediss://') || redisUrl.startsWith('redis://')) {
-        // Parse redis:// URL to extract host and credentials for REST API
-        const url = new URL(redisUrl);
+      if (isUpstash) {
+        // For Upstash, use REST API client
+        const { Redis } = await import('@upstash/redis');
 
-        // Convert to Upstash REST API URL format
-        // For Upstash: https://{host}
-        const restUrl = `https://${url.hostname}`;
+        let clientConfig;
+        if (redisUrl.startsWith('rediss://') || redisUrl.startsWith('redis://')) {
+          // Parse redis:// URL to extract host and credentials for REST API
+          const url = new URL(redisUrl);
+          const restUrl = `https://${url.hostname}`;
+          clientConfig = {
+            url: restUrl,
+            token: url.password
+          };
+          console.log(`🔗 Converting Upstash Redis URL to REST API: ${restUrl}`);
+        } else {
+          clientConfig = { url: redisUrl };
+        }
 
-        clientConfig = {
-          url: restUrl,
-          token: url.password // Extract password from redis://user:pass@host URL
-        };
-
-        console.log(`🔗 Converting Redis URL to REST API: ${restUrl}`);
-      } else if (redisUrl.startsWith('https://')) {
-        // Already an HTTPS URL (Upstash REST API URL)
-        clientConfig = { url: redisUrl };
+        this.redis = new Redis(clientConfig);
       } else {
-        // Assume it's some other format
-        clientConfig = { url: redisUrl };
-      }
+        // For Redis.com and other standard Redis, use node-redis client
+        const redis = await import('redis');
+        this.redis = redis.createClient({
+          url: redisUrl
+        });
 
-      this.redis = new Redis(clientConfig);
+        this.redis.on('error', (err) => {
+          console.error('Redis Client Error:', err);
+        });
+
+        console.log('🔗 Using standard Redis client for Redis.com');
+      }
 
       // Test connection
       await this.redis.ping();
