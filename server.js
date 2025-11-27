@@ -44,6 +44,9 @@ app.use(cors({
   credentials: false
 }));
 
+// Trust proxy for Vercel (needed for express-rate-limit)
+app.set('trust proxy', true);
+
 app.use(express.json({ limit: '10mb' }));
 
 // Explicitly serve crypto-utils.js with correct MIME type

@@ -99,7 +99,14 @@ class StorageManager {
         throw new Error('REDIS_URL environment variable is not set');
       }
 
-      console.log(`🔗 Attempting to connect to Redis with URL: ${redisUrl.replace(/:.*@/, ':***@')}`);
+      // Ensure Redis URL uses secure connection
+      let secureRedisUrl = redisUrl;
+      if (redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
+        secureRedisUrl = redisUrl.replace('redis://', 'rediss://');
+        console.log('🔗 Upgraded redis:// to rediss:// for secure connection');
+      }
+
+      console.log(`🔗 Attempting to connect to Redis with URL: ${secureRedisUrl.replace(/:.*@/, ':***@')}`);
 
       // Check for Upstash-specific patterns in URL
       const isUpstash = redisUrl && (
@@ -132,10 +139,10 @@ class StorageManager {
         const redis = await import('redis');
         console.log('🔗 Detected standard Redis, using node-redis client');
         this.redis = redis.createClient({
-          url: redisUrl,
+          url: secureRedisUrl,
           socket: {
-            connectTimeout: 5000,
-            lazyConnect: true
+            connectTimeout: 10000,
+            lazyConnect: false  // Disable lazy connect for serverless
           }
         });
 
@@ -150,12 +157,19 @@ class StorageManager {
         this.redis.on('ready', () => {
           console.log('✅ Redis client ready');
         });
+
+        // Explicitly connect the Redis client
+        await this.redis.connect();
       }
 
-      // Test connection
-      console.log('🔗 Testing Redis connection...');
-      await this.redis.ping();
-      console.log('✅ Redis connected successfully via REDIS_URL');
+      // Test connection (only for standard Redis, Upstash handles this differently)
+      if (!isUpstash) {
+        console.log('🔗 Testing Redis connection...');
+        await this.redis.ping();
+        console.log('✅ Redis connected successfully via REDIS_URL');
+      } else {
+        console.log('✅ Upstash Redis connected successfully via REDIS_URL');
+      }
     } catch (error) {
       console.error('❌ Failed to connect to Redis via REDIS_URL:', {
         message: error.message,
