@@ -95,6 +95,12 @@ class StorageManager {
       // Check if this is Upstash Redis or regular Redis
       const redisUrl = process.env.REDIS_URL;
 
+      if (!redisUrl) {
+        throw new Error('REDIS_URL environment variable is not set');
+      }
+
+      console.log(`🔗 Attempting to connect to Redis with URL: ${redisUrl.replace(/:.*@/, ':***@')}`);
+
       // Check for Upstash-specific patterns in URL
       const isUpstash = redisUrl && (
         redisUrl.includes('upstash.io') ||
@@ -124,23 +130,40 @@ class StorageManager {
       } else {
         // For Redis.com and other standard Redis, use node-redis client
         const redis = await import('redis');
+        console.log('🔗 Detected standard Redis, using node-redis client');
         this.redis = redis.createClient({
-          url: redisUrl
+          url: redisUrl,
+          socket: {
+            connectTimeout: 5000,
+            lazyConnect: true
+          }
         });
 
         this.redis.on('error', (err) => {
-          console.error('Redis Client Error:', err);
+          console.error('Redis Client Error:', err.message);
         });
 
-        console.log('🔗 Using standard Redis client for Redis.com');
+        this.redis.on('connect', () => {
+          console.log('🔗 Redis client connecting...');
+        });
+
+        this.redis.on('ready', () => {
+          console.log('✅ Redis client ready');
+        });
       }
 
       // Test connection
+      console.log('🔗 Testing Redis connection...');
       await this.redis.ping();
       console.log('✅ Redis connected successfully via REDIS_URL');
     } catch (error) {
-      console.error('❌ Failed to connect to Redis via REDIS_URL:', error);
-      throw new Error('Redis initialization failed');
+      console.error('❌ Failed to connect to Redis via REDIS_URL:', {
+        message: error.message,
+        stack: error.stack,
+        urlExists: !!process.env.REDIS_URL,
+        urlFormat: process.env.REDIS_URL ? process.env.REDIS_URL.substring(0, 20) + '...' : 'none'
+      });
+      throw new Error(`Redis initialization failed: ${error.message}`);
     }
   }
 
